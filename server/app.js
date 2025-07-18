@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const mongoose = require('mongoose');
 const errorHandler = require('./middleware/errorHandler');
 const { requestLogger, errorTracker, performanceMonitor } = require('./middleware/monitoring');
 
