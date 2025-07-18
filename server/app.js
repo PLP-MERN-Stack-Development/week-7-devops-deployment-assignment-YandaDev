@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const errorHandler = require('./middleware/errorHandler');
+const { requestLogger, errorTracker, performanceMonitor } = require('./middleware/monitoring');
 
 // Import routes
 const postRoutes = require('./routes/posts');
@@ -15,6 +16,9 @@ dotenv.config();
 
 // Initialize Express app
 const app = express();
+
+// Request logging middleware (should be first)
+app.use(requestLogger);
 
 // Security middleware for production
 if (process.env.NODE_ENV === 'production') {
@@ -59,14 +63,133 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/auth', authRoutes);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0'
-  });
+app.get('/health', async (req, res) => {
+  try {
+    // Check database connectivity
+    const dbStatus = mongoose.connection.readyState;
+    const dbStatusText = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    };
+
+    // Get database stats
+    let dbStats = null;
+    if (dbStatus === 1) {
+      try {
+        dbStats = await mongoose.connection.db.stats();
+      } catch (err) {
+        console.warn('Could not get database stats:', err.message);
+      }
+    }
+
+    const healthData = {
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      version: process.env.npm_package_version || '1.0.0',
+      database: {
+        status: dbStatusText[dbStatus],
+        connected: dbStatus === 1,
+        ...(dbStats && {
+          collections: dbStats.collections,
+          dataSize: dbStats.dataSize,
+          storageSize: dbStats.storageSize
+        })
+      },
+      memory: {
+        used: process.memoryUsage().heapUsed,
+        total: process.memoryUsage().heapTotal,
+        external: process.memoryUsage().external
+      },
+      system: {
+        platform: process.platform,
+        nodeVersion: process.version,
+        pid: process.pid
+      }
+    };
+
+    res.status(200).json(healthData);
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(503).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      uptime: process.uptime()
+    });
+  }
+});
+
+// Metrics endpoint for monitoring
+app.get('/api/metrics', async (req, res) => {
+  try {
+    const Post = require('./models/Post');
+    const User = require('./models/User');
+    const Category = require('./models/Category');
+
+    // Get basic stats
+    const [postCount, userCount, categoryCount] = await Promise.all([
+      Post.countDocuments(),
+      User.countDocuments(),
+      Category.countDocuments()
+    ]);
+
+    // Get recent activity (last 24 hours)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [recentPosts, recentUsers] = await Promise.all([
+      Post.countDocuments({ createdAt: { $gte: yesterday } }),
+      User.countDocuments({ createdAt: { $gte: yesterday } })
+    ]);
+
+    // System metrics
+    const memoryUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      application: {
+        name: 'TechTalkZA',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        uptime: process.uptime()
+      },
+      database: {
+        posts: postCount,
+        users: userCount,
+        categories: categoryCount,
+        recent_posts_24h: recentPosts,
+        recent_users_24h: recentUsers
+      },
+      system: {
+        memory: {
+          rss: memoryUsage.rss,
+          heapTotal: memoryUsage.heapTotal,
+          heapUsed: memoryUsage.heapUsed,
+          external: memoryUsage.external
+        },
+        cpu: {
+          user: cpuUsage.user,
+          system: cpuUsage.system
+        },
+        platform: process.platform,
+        nodeVersion: process.version
+      },
+      monitoring: {
+        healthCheck: '/health',
+        metrics: '/api/metrics',
+        lastUpdated: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Metrics error:', error);
+    res.status(500).json({
+      error: 'Unable to fetch metrics',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Error handling middleware
