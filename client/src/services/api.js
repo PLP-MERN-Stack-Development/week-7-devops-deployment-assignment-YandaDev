@@ -100,6 +100,12 @@ export const categoryService = {
     const response = await api.post('/categories', categoryData);
     return response.data;
   },
+
+  // Seed default categories
+  seedCategories: async () => {
+    const response = await api.post('/categories/seed');
+    return response.data;
+  },
 };
 
 // Auth API services
