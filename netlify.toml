@@ -1,6 +1,6 @@
 [build]
   base = "client"
-  publish = "client/dist"
+  publish = "dist"
   command = "pnpm run build"
 
 [build.environment]
@@ -15,4 +15,4 @@
 [dev]
   command = "pnpm dev"
   port = 5174
-  publish = "client/dist"
+  publish = "dist"
