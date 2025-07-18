@@ -63,64 +63,14 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/auth', authRoutes);
 
 // Health check endpoint
-app.get('/health', async (req, res) => {
-  try {
-    // Check database connectivity
-    const dbStatus = mongoose.connection.readyState;
-    const dbStatusText = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting'
-    };
-
-    // Get database stats
-    let dbStats = null;
-    if (dbStatus === 1) {
-      try {
-        dbStats = await mongoose.connection.db.stats();
-      } catch (err) {
-        console.warn('Could not get database stats:', err.message);
-      }
-    }
-
-    const healthData = {
-      status: 'OK',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development',
-      version: process.env.npm_package_version || '1.0.0',
-      database: {
-        status: dbStatusText[dbStatus],
-        connected: dbStatus === 1,
-        ...(dbStats && {
-          collections: dbStats.collections,
-          dataSize: dbStats.dataSize,
-          storageSize: dbStats.storageSize
-        })
-      },
-      memory: {
-        used: process.memoryUsage().heapUsed,
-        total: process.memoryUsage().heapTotal,
-        external: process.memoryUsage().external
-      },
-      system: {
-        platform: process.platform,
-        nodeVersion: process.version,
-        pid: process.pid
-      }
-    };
-
-    res.status(200).json(healthData);
-  } catch (error) {
-    console.error('Health check error:', error);
-    res.status(503).json({
-      status: 'ERROR',
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      uptime: process.uptime()
-    });
-  }
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || '1.0.0'
+  });
 });
 
 // Metrics endpoint for monitoring
