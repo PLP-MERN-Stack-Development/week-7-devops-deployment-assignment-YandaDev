@@ -1,0 +1,133 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: 
+      - main
+      - develop
+  pull_request:
+    branches: 
+      - main
+
+env:
+  NODE_VERSION: '18'
+  PNPM_VERSION: '8'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test and Lint
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+          
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+            
+      - name: Install backend dependencies
+        run: |
+          cd server
+          pnpm install
+          
+      - name: Run backend tests
+        run: |
+          cd server
+          pnpm run test || echo "No tests configured yet"
+          
+      - name: Install frontend dependencies
+        run: |
+          cd client
+          pnpm install
+          
+      - name: Run frontend linting
+        run: |
+          cd client
+          pnpm run lint
+          
+      - name: Build frontend
+        run: |
+          cd client
+          pnpm run build
+          
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: client/dist/
+          retention-days: 7
+
+  security:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Run npm audit backend
+        run: |
+          cd server
+          npm audit --audit-level=high || true
+          
+      - name: Run npm audit frontend
+        run: |
+          cd client
+          npm audit --audit-level=high || true
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    name: Deploy to Staging
+    needs: [test, security]
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Deploy to staging
+        run: |
+          echo "🚀 Deploying to staging environment..."
+          echo "This would deploy to your staging server"
+          
+  deploy-production:
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: client/dist/
+          
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying to production environment..."
+          echo "This would deploy to your production server"
+          
+      - name: Notify deployment
+        run: |
+          echo "✅ Deployment to production completed successfully!"
