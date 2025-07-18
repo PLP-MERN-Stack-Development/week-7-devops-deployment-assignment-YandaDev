@@ -7,6 +7,7 @@
   PNPM_VERSION = "8"
   NODE_VERSION = "18"
 
+# Single Page Application redirects
 [[redirects]]
   from = "/*"
   to = "/index.html"
