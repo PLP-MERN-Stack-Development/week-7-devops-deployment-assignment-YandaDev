@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usePosts } from '../context/PostContext';
 import { useAuth } from '../context/AuthContext';
+import { useCategories } from '../context/CategoriesContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,8 +16,10 @@ function PostForm({ initialData = {}, categories, loading, isEdit = false, postI
   const [featuredImage, setFeaturedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [errors, setErrors] = useState({});
+  const [seedingCategories, setSeedingCategories] = useState(false);
   const { error: postError } = usePosts();
   const { user } = useAuth();
+  const { seedCategories } = useCategories();
 
   useEffect(() => {
     setTitle(initialData.title || '');
@@ -54,6 +57,19 @@ function PostForm({ initialData = {}, categories, loading, isEdit = false, postI
       };
       reader.readAsDataURL(file);
       setErrors(prev => ({ ...prev, image: '' }));
+    }
+  };
+
+  const handleSeedCategories = async () => {
+    try {
+      setSeedingCategories(true);
+      await seedCategories();
+      // Categories will be automatically updated through the context
+    } catch (error) {
+      console.error('Error seeding categories:', error);
+      setErrors(prev => ({ ...prev, categories: 'Failed to seed categories' }));
+    } finally {
+      setSeedingCategories(false);
     }
   };
 
@@ -254,11 +270,22 @@ function PostForm({ initialData = {}, categories, loading, isEdit = false, postI
                 </Select>
                 {errors.category && <div className="text-red-500 text-sm mt-1">{errors.category}</div>}
                 {(!categories || categories.length === 0) && (
-                  <div className="text-amber-600 text-sm mt-1 flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    No categories available. Please create categories first.
+                  <div className="space-y-2">
+                    <div className="text-amber-600 text-sm mt-1 flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      No categories available. You need categories to create a post.
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleSeedCategories}
+                      disabled={seedingCategories}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {seedingCategories ? 'Creating Categories...' : 'Create Default Categories'}
+                    </Button>
                   </div>
                 )}
               </div>
@@ -290,13 +317,20 @@ function PostForm({ initialData = {}, categories, loading, isEdit = false, postI
             <div className="pt-4">
               <Button
                 type="submit"
-                disabled={loading}
-                className="w-full text-lg py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                disabled={loading || !categories || categories.length === 0}
+                className="w-full text-lg py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     Saving Story...
+                  </div>
+                ) : (!categories || categories.length === 0) ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Create Categories First
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2">

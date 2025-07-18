@@ -26,6 +26,22 @@ export function CategoriesProvider({ children }) {
     }
   };
 
+  const seedCategories = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await categoryService.seedCategories();
+      setCategories(data.categories);
+      return data;
+    } catch (err) {
+      setError(err.message || 'Failed to seed categories');
+      console.error('Error seeding categories:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -40,7 +56,8 @@ export function CategoriesProvider({ children }) {
       setCategories, 
       loading, 
       error, 
-      refetchCategories 
+      refetchCategories,
+      seedCategories 
     }}>
       {children}
     </CategoriesContext.Provider>
